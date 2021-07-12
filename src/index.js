@@ -40,6 +40,6 @@ server.on('close', () => {
 });
 
 server.listen({
-    udp: 5333
+    udp: 53
 });
 
