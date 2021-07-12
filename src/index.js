@@ -4,6 +4,8 @@ const { Packet } = dns2;
 const server = dns2.createServer({
     udp: true,
     handle: (request, send, rinfo) => {
+        console.log(request)
+        console.log(rinfo)
         const response = Packet.createResponseFromRequest(request);
         const [ question ] = request.questions;
         const { name } = question;
@@ -12,7 +14,7 @@ const server = dns2.createServer({
             name,
             type: Packet.TYPE.A,
             class: Packet.CLASS.IN,
-            ttl: 30,
+            ttl: 1,
             address: '8.8.8.8'
         });
 
@@ -20,7 +22,7 @@ const server = dns2.createServer({
             name,
             type: Packet.TYPE.A,
             class: Packet.CLASS.IN,
-            ttl: 30,
+            ttl: 1,
             address: '8.8.8.4'
         });
         send(response);
