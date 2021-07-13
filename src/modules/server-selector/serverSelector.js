@@ -18,7 +18,6 @@ const selectOptimalServerBasedOnLocation = (
 
 		let availableServers = getTrackedServersClearingRepublishedStreamsField().filter(
 			(current) => {
-				console.log(current);
 				const isServerExcluded =
 					excludedServers.filter((currentExcludedServer) => {
 						return currentExcludedServer === current.name;
@@ -36,6 +35,8 @@ const selectOptimalServerBasedOnLocation = (
 				);
 			}
 		);
+
+		console.log(availableServers);
 
 		if (debugMode)
 			debugResult.stepOne = {
