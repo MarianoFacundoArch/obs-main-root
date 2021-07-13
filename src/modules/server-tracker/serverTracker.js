@@ -520,8 +520,8 @@ const getTrackedServersClearingRepublishedStreamsField = () => {
 		let response = [];
 		trackedServers.forEach((current) => {
 			let newCurrentTrackedServerForResponse = { ...current };
-			if (newCurrentTrackedServerForResponse.republishedStreamsInCurrentServer)
-				delete newCurrentTrackedServerForResponse.republishedStreamsInCurrentServer;
+			if (newCurrentTrackedServerForResponse.streamsInCurrentServer)
+				delete newCurrentTrackedServerForResponse.streamsInCurrentServer;
 			response = [...response, newCurrentTrackedServerForResponse];
 		});
 		return response;
@@ -536,8 +536,8 @@ const getServersThatAreNotDisabledAndNotInMaintenanceAndCanReceiveNewStreamsClea
 			let response = [];
 			trackedServers.forEach((current) => {
 				let newCurrentTrackedServerForResponse = { ...current };
-				if (newCurrentTrackedServerForResponse.republishedStreamsInCurrentServer)
-					delete newCurrentTrackedServerForResponse.republishedStreamsInCurrentServer;
+				if (newCurrentTrackedServerForResponse.streamsInCurrentServer)
+					delete newCurrentTrackedServerForResponse.streamsInCurrentServer;
 				if (
 					!current.disabled &&
 					!current.maintenance &&
