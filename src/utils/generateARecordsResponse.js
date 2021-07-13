@@ -14,6 +14,8 @@ const generateARecordsResponse = (clientIp, responseAnswersObject) => {
 		availableServers = getTrackedServers();
 	}
 
+	console.log(availableServers);
+
 	if (availableServers) {
 		availableServers.forEach((current) => {
 			responseAnswersObject.push({
