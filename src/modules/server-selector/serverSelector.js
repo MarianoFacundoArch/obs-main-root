@@ -36,7 +36,6 @@ const selectOptimalServerBasedOnLocation = (
 			}
 		);
 
-		console.log(availableServers);
 
 		if (debugMode)
 			debugResult.stepOne = {
