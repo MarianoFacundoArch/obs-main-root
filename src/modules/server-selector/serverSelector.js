@@ -49,6 +49,7 @@ const selectOptimalServerBasedOnLocation = (
 		}
 
 		const clientGeoIp = getFullLocationInformation(clientIp);
+		logger.debug(clientGeoIp);
 		const clientCoordinates = [clientGeoIp.location.latitude, clientGeoIp.location.longitude];
 		availableServers.forEach((current) => {
 			current.distanceToClientIp = geolib.getDistance(
