@@ -11,13 +11,16 @@ const { Packet } = dns2;
 const server = dns2.createServer({
 	udp: true,
 	handle: (request, send, rinfo) => {
-		const response = Packet.createResponseFromRequest(request);
-		const [question] = request.questions;
-		const { name } = question;
-		console.log(name);
+		try {
+			const response = Packet.createResponseFromRequest(request);
+			const [question] = request.questions;
+			const { name } = question;
 
-		generateARecordsResponse(!!rinfo ? rinfo.address : null, response.answers);
-		send(response);
+			generateARecordsResponse(!!rinfo ? rinfo.address : null, response.answers, name);
+			send(response);
+		} catch (err) {
+			logger.error('Error on handle dns2: ' + err.toString());
+		}
 	}
 });
 

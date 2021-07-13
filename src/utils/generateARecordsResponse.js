@@ -4,7 +4,7 @@ const { selectOptimalServerBasedOnLocation } = require('../modules/server-select
 const dns2 = require('dns2');
 const { Packet } = dns2;
 
-const generateARecordsResponse = (clientIp, responseAnswersObject) => {
+const generateARecordsResponse = (clientIp, responseAnswersObject, name) => {
 	const response = [];
 	let availableServers;
 	try {
@@ -13,8 +13,6 @@ const generateARecordsResponse = (clientIp, responseAnswersObject) => {
 		logger.error('Error on generateARecordsResponse: ' + err.toString());
 		availableServers = getTrackedServers();
 	}
-
-	console.log(availableServers);
 
 	if (availableServers) {
 		availableServers.forEach((current) => {
