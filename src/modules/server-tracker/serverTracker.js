@@ -95,7 +95,57 @@ const evaluateAndDisplayDebugInformationBasedOnChanges = (
 		if (newServerObject.maintenance) {
 			logger.warn('Server ' + newServerObject.name + ' set on maintenance on discovery.');
 		}
+
+		if (newServerObject.isBackupServer) {
+			logger.warn('Server ' + newServerObject.name + ' set as backup server on discovery.');
+		}
+
+		if (newServerObject.serverTags) {
+			logger.warn(
+				'Server ' +
+					newServerObject.name +
+					' is set only for tags ' +
+					(Array.isArray(newServerObject.serverTags)
+						? newServerObject.serverTags.join(', ')
+						: newServerObject.serverTags)
+			);
+		}
 	} else {
+		if (newServerObject.serverTags && !existingServerObject.serverTags) {
+			logger.warn(
+				'Server ' +
+					newServerObject.name +
+					' is now set only for tags ' +
+					(Array.isArray(newServerObject.serverTags)
+						? newServerObject.serverTags.join(', ')
+						: newServerObject.serverTags)
+			);
+		}
+		if (!newServerObject.serverTags && existingServerObject.serverTags) {
+			logger.warn('Server ' + newServerObject.name + ' is no longer tag limitted');
+		}
+		if (
+			newServerObject.serverTags &&
+			existingServerObject.serverTags &&
+			JSON.stringify(newServerObject.serverTags) !==
+				JSON.stringify(existingServerObject.serverTags)
+		) {
+			logger.warn(
+				'Server ' +
+					newServerObject.name +
+					' modified its tags to ' +
+					(Array.isArray(newServerObject.serverTags)
+						? newServerObject.serverTags.join(', ')
+						: newServerObject.serverTags)
+			);
+		}
+		if (existingServerObject.isBackupServer && !newServerObject.isBackupServer) {
+			logger.warn('Server ' + newServerObject.name + ' is no longer a backup server.');
+		}
+
+		if (!existingServerObject.isBackupServer && newServerObject.isBackupServer) {
+			logger.warn('Server ' + newServerObject.name + ' is now a backup server.');
+		}
 		if (
 			existingServerObject.serverCanReceiveNewStreams &&
 			!newServerObject.serverCanReceiveNewStreams
@@ -480,6 +530,28 @@ const getTrackedServersClearingRepublishedStreamsField = () => {
 	}
 };
 
+const getServersThatAreNotDisabledAndNotInMaintenanceAndCanReceiveNewStreamsClearingRepublishedStreamsField =
+	() => {
+		try {
+			let response = [];
+			trackedServers.forEach((current) => {
+				let newCurrentTrackedServerForResponse = { ...current };
+				if (newCurrentTrackedServerForResponse.republishedStreamsInCurrentServer)
+					delete newCurrentTrackedServerForResponse.republishedStreamsInCurrentServer;
+				if (
+					!current.disabled &&
+					!current.maintenance &&
+					current.serverCanReceiveNewStreams
+				) {
+					response = [...response, newCurrentTrackedServerForResponse];
+				}
+			});
+			return response;
+		} catch (err) {
+			logger.error('Error on getTrackedServersClearingRepublishedStreamsField' + err);
+		}
+	};
+
 const getOfflineTrackedServers = () => {
 	return trackedServers.filter((current) => {
 		return current.consequentFailures > 0;
@@ -550,13 +622,10 @@ const getServerIsDisabled = (serverName) => {
 
 const getBusyServers = () => {
 	return trackedServers.filter((current) => {
-		if (current.cpuUsage && current.cpuUsage >= configProvider.WEBRTC_LEAVES_MAX_CPU_USAGE)
+		if (current.cpuUsage && current.cpuUsage >= configProvider.OBS_LEAVES_MAX_CPU_USAGE)
 			return true;
 
-		if (
-			current.maxGpuUsage &&
-			current.maxGpuUsage >= configProvider.WEBRTC_LEAVES_MAX_GPU_USAGE
-		)
+		if (current.maxGpuUsage && current.maxGpuUsage >= configProvider.OBS_LEAVES_MAX_GPU_USAGE)
 			return true;
 		return false;
 	});
@@ -579,5 +648,6 @@ module.exports = {
 	findTrackedServerByServerName,
 	clearSpecificStreamStats,
 	getWithConsequentFailuresOrCantReceiveNewStreams,
-	clearAllStreamStats
+	clearAllStreamStats,
+	getServersThatAreNotDisabledAndNotInMaintenanceAndCanReceiveNewStreamsClearingRepublishedStreamsField
 };

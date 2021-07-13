@@ -1,5 +1,6 @@
 const configProvider = require('./modules/config-provider/configProvider');
 const dns2 = require('dns2');
+const cors = require('cors');
 const logger = require('./modules/logger/logger');
 const { generateARecordsResponse } = require('./utils/generateARecordsResponse');
 const { processTrackedServersTimeouts } = require('./modules/server-tracker/serverTracker');
@@ -7,7 +8,18 @@ const { trackServers } = require('./modules/server-tracker/serverTracker');
 const { getDiscoveredServers } = require('./modules/server-discovery/serverDiscover');
 const { discoverServers } = require('./modules/server-discovery/serverDiscover');
 const { Packet } = dns2;
+const express = require('express');
+const app = express();
+const requestIp = require('request-ip');
+const debugRouter = require('./routers/debugRouter');
+const corsOptions = {
+	origin: '*',
+	optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204
+};
+app.use(cors(corsOptions));
+app.use(requestIp.mw());
 
+app.use(debugRouter);
 const server = dns2.createServer({
 	udp: true,
 	handle: (request, send, rinfo) => {
@@ -63,6 +75,10 @@ require('./modules/geoip/geoIp')
 
 			server.listen({
 				udp: configProvider.DNS_SERVER_PORT
+			});
+
+			app.listen(configProvider.HTTP_SERVER_PORT, () => {
+				logger.debug('HTTP Server listening on port ' + configProvider.HTTP_SERVER_PORT);
 			});
 		} catch (err) {
 			logger.error('Error on index.js: ' + err.toString());

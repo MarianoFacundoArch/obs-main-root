@@ -2,6 +2,9 @@ const geolib = require('geolib');
 const configProvider = require('../config-provider/configProvider');
 
 const logger = require('../logger/logger');
+const {
+	getServersThatAreNotDisabledAndNotInMaintenanceAndCanReceiveNewStreamsClearingRepublishedStreamsField
+} = require('../server-tracker/serverTracker');
 const { getFullLocationInformation } = require('../geoip/geoIp');
 const { findTrackedServerByServerName } = require('../server-tracker/serverTracker');
 const {
@@ -10,36 +13,59 @@ const {
 
 const selectOptimalServerBasedOnLocation = (
 	clientIp = '85.208.100.21',
+	requestedFromHostname,
 	excludedServers = [],
 	debugMode = false
 ) => {
 	try {
 		let debugResult = { debugMode: debugMode };
 
-		let availableServers = getTrackedServersClearingRepublishedStreamsField().filter(
-			(current) => {
-				const isServerExcluded =
-					excludedServers.filter((currentExcludedServer) => {
-						return currentExcludedServer === current.name;
-					}).length > 0;
-				return (
-					!isServerExcluded &&
-					!current.disabled &&
-					!current.maintenance &&
-					current.consequentFailures === 0 &&
-					(!current.cpuUsage ||
-						current.cpuUsage < configProvider.WEBRTC_LEAVES_MAX_CPU_USAGE) &&
-					(!current.maxGpuUsage ||
-						current.maxGpuUsage < configProvider.WEBRTC_LEAVES_MAX_GPU_USAGE) &&
-					current.serverCanReceiveNewStreams
-				);
-			}
-		);
+		let availableServers =
+			getServersThatAreNotDisabledAndNotInMaintenanceAndCanReceiveNewStreamsClearingRepublishedStreamsField().filter(
+				(current) => {
+					const isServerExcluded =
+						excludedServers.filter((currentExcludedServer) => {
+							return currentExcludedServer === current.name;
+						}).length > 0;
+
+					let serverShouldBeReturnedAfterTagsLimitations = !current.serverTags;
+					if (!serverShouldBeReturnedAfterTagsLimitations) {
+						if (Array.isArray(current.serverTags)) {
+							current.serverTags.forEach((currentServerTag) => {
+								if (
+									requestedFromHostname &&
+									requestedFromHostname.includes(currentServerTag)
+								) {
+									serverShouldBeReturnedAfterTagsLimitations = true;
+								}
+							});
+						} else {
+							if (
+								requestedFromHostname &&
+								requestedFromHostname.includes(current.serverTags)
+							)
+								serverShouldBeReturnedAfterTagsLimitations = true;
+						}
+					}
+					return (
+						serverShouldBeReturnedAfterTagsLimitations &&
+						!isServerExcluded &&
+						// !current.disabled &&
+						// !current.maintenance &&
+						// current.serverCanReceiveNewStreams &&
+						current.consequentFailures === 0 &&
+						(!current.cpuUsage ||
+							current.cpuUsage < configProvider.OBS_LEAVES_MAX_CPU_USAGE) &&
+						(!current.maxGpuUsage ||
+							current.maxGpuUsage < configProvider.OBS_LEAVES_MAX_GPU_USAGE)
+					);
+				}
+			);
 
 		if (debugMode)
 			debugResult.stepOne = {
 				description:
-					'List of available servers that are not under maintenance, not disabled, does not have any consequent failure, they report to be in good health and resources usage are OK from root evaluation',
+					'List of available servers that are not under maintenance, not disabled, does not have any consequent failure, they report to be in good health and resources usage are OK from root evaluation and are also accomplishing tags limitations',
 				servers: availableServers
 			};
 
@@ -49,14 +75,22 @@ const selectOptimalServerBasedOnLocation = (
 		}
 
 		const clientGeoIp = getFullLocationInformation(clientIp);
-		logger.debug(clientGeoIp);
-		const clientCoordinates = [clientGeoIp.location.latitude, clientGeoIp.location.longitude];
-		availableServers.forEach((current) => {
-			current.distanceToClientIp = geolib.getDistance(
-				{ latitude: current.ll[0], longitude: current.ll[1] },
-				{ latitude: clientCoordinates[0], longitude: clientCoordinates[1] }
-			);
-		});
+		if (clientGeoIp) {
+			const clientCoordinates = [
+				clientGeoIp.location.latitude,
+				clientGeoIp.location.longitude
+			];
+			availableServers.forEach((current) => {
+				current.distanceToClientIp = geolib.getDistance(
+					{ latitude: current.ll[0], longitude: current.ll[1] },
+					{ latitude: clientCoordinates[0], longitude: clientCoordinates[1] }
+				);
+			});
+		} else {
+			availableServers.forEach((current) => {
+				current.distanceToClientIp = 0;
+			});
+		}
 
 		// Sort the available ones based on geoLocation
 		availableServers.sort((a, b) => {
@@ -69,7 +103,16 @@ const selectOptimalServerBasedOnLocation = (
 				servers: availableServers
 			};
 
-		const distanceToNearestServerInKm = availableServers[0].distanceToClientIp / 1000;
+		let distanceToNearestServerInKm = availableServers[0].distanceToClientIp / 1000;
+		/* If was backup server, take nearest non backup server */
+		if (availableServers[0].isBackupServer) {
+			let nonBackupServers = availableServers.filter((current) => {
+				return !current.isBackupServer;
+			});
+
+			if (nonBackupServers && nonBackupServers.length > 0)
+				distanceToNearestServerInKm = nonBackupServers[0].distanceToClientIp / 1000;
+		}
 
 		// Select only those within the configured radius
 		availableServers = availableServers.filter((current) => {
@@ -81,20 +124,39 @@ const selectOptimalServerBasedOnLocation = (
 
 		// Sort the resulting available ones based on max usage medition
 		availableServers.sort((a, b) => {
-			return a.maxUsageMedition < b.maxUsageMedition ? -1 : 1;
+			return a.maxUsageMedition > b.maxUsageMedition ? 1 : -1;
 		});
 
 		if (debugMode)
 			debugResult.stepThree = {
 				description:
-					'Servers within allowed radius from the available closest one, ordered by CPU usage',
+					'Servers within allowed radius from the available closest one considering backupserver condition, ordered by CPU usage and then Backup Servers',
 				servers: availableServers
 			};
 
-		availableServers = availableServers.slice(
-			0,
-			configProvider.NUMBER_OF_SERVERS_TO_RETRIEVE_VIA_A_RECORD + 1
-		);
+		let nonBackupServers = availableServers.filter((current) => {
+			return !current.isBackupServer;
+		});
+
+		if (nonBackupServers && nonBackupServers.length > 0) {
+			availableServers = [...nonBackupServers];
+
+			if (debugMode)
+				debugResult.stepFour = {
+					description: 'Filtered nonBackupServers',
+					servers: availableServers
+				};
+		} else {
+			logger.error('No available nonBackup Servers. Returning backup servers');
+		}
+
+		if (availableServers.length > configProvider.NUMBER_OF_SERVERS_TO_RETRIEVE_VIA_A_RECORD) {
+			availableServers = availableServers.slice(
+				0,
+				configProvider.NUMBER_OF_SERVERS_TO_RETRIEVE_VIA_A_RECORD + 1
+			);
+		}
+
 		if (debugMode)
 			debugResult.result = {
 				description: 'Resulting selection',
@@ -117,14 +179,14 @@ const evaluateIfSpecificServerCanAcceptNewStreams = (serverName) => {
 	if (serverObjectToEvaluate) {
 		if (
 			serverObjectToEvaluate.cpuUsage !== null &&
-			serverObjectToEvaluate.cpuUsage > configProvider.WEBRTC_LEAVES_MAX_CPU_USAGE
+			serverObjectToEvaluate.cpuUsage > configProvider.OBS_LEAVES_MAX_CPU_USAGE
 		)
 			canAcceptNewStreams = false;
 
 		if (
 			canAcceptNewStreams &&
 			serverObjectToEvaluate.maxGpuUsage !== null &&
-			serverObjectToEvaluate.maxGpuUsage > configProvider.WEBRTC_LEAVES_MAX_GPU_USAGE
+			serverObjectToEvaluate.maxGpuUsage > configProvider.OBS_LEAVES_MAX_GPU_USAGE
 		)
 			canAcceptNewStreams = false;
 

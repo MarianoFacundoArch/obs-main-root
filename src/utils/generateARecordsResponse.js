@@ -2,16 +2,20 @@ const logger = require('../modules/logger/logger');
 const { getTrackedServers } = require('../modules/server-tracker/serverTracker');
 const { selectOptimalServerBasedOnLocation } = require('../modules/server-selector/serverSelector');
 const dns2 = require('dns2');
+const {
+	getServersThatAreNotDisabledAndNotInMaintenanceAndCanReceiveNewStreamsClearingRepublishedStreamsField
+} = require('../modules/server-tracker/serverTracker');
 const { Packet } = dns2;
 
 const generateARecordsResponse = (clientIp, responseAnswersObject, name) => {
 	const response = [];
 	let availableServers;
 	try {
-		availableServers = [...selectOptimalServerBasedOnLocation(clientIp)];
+		availableServers = [...selectOptimalServerBasedOnLocation(clientIp, name)];
 	} catch (err) {
 		logger.error('Error on generateARecordsResponse: ' + err.toString());
-		availableServers = getTrackedServers();
+		availableServers =
+			getServersThatAreNotDisabledAndNotInMaintenanceAndCanReceiveNewStreamsClearingRepublishedStreamsField();
 	}
 
 	if (availableServers) {
