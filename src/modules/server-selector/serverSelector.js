@@ -153,7 +153,7 @@ const selectOptimalServerBasedOnLocation = (
 		if (availableServers.length > configProvider.NUMBER_OF_SERVERS_TO_RETRIEVE_VIA_A_RECORD) {
 			availableServers = availableServers.slice(
 				0,
-				configProvider.NUMBER_OF_SERVERS_TO_RETRIEVE_VIA_A_RECORD + 1
+				configProvider.NUMBER_OF_SERVERS_TO_RETRIEVE_VIA_A_RECORD
 			);
 		}
 
