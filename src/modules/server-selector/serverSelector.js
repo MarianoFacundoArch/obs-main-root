@@ -36,7 +36,6 @@ const selectOptimalServerBasedOnLocation = (
 			}
 		);
 
-
 		if (debugMode)
 			debugResult.stepOne = {
 				description:
